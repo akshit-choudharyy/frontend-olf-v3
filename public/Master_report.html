@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trehan IRIS Project Performance Dashboard (Interactive)</title>
+    <!-- Include Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* CSS Variables */
+        :root {
+            --primary: #0056b3; /* Existing: Primary Blue */
+            --primary-light: #e6f0fa; /* For recommendation badges */
+            --secondary: #4a5568; /* Dark Gray */
+            --danger: #dc3545;  /* Bootstrap danger red */
+            --warning: #ffc107; /* Bootstrap warning yellow */
+            --success: #28a745; /* Bootstrap success green */
+            --dark: #343a40; /* Dark Gray */
+            --light: #f8f9fa; /* Light Gray Background */
+            --border: #dee2e6; /* Border Gray */
+            --text: #343a40; /* Main Text Dark Gray */
+            --text-light: #6c757d; /* Lighter Text Gray */
+            --shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24); /* Shadow */
+            --orange: #fd7e14; /* Orange for Schedule/Medium Priority */
+            --blue: #007bff; /* Standard Blue */
+            --teal: #20c997; /* Teal */
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--light);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .dashboard-container {
+            max-width: 1500px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        /* Header Styles (Existing) */
+        header {
+            border-bottom: 3px solid var(--primary);
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+        }
+        header h1 {
+            color: var(--primary);
+            margin: 0 0 10px 0;
+            font-size: 2em;
+            font-weight: 600;
+        }
+        header h2 {
+            color: #495057;
+            margin: 5px 0;
+            font-size: 1.5em;
+            font-weight: 500;
+        }
+        header p {
+            margin: 5px 0;
+            font-size: 0.95em;
+            color: var(--text-light);
+        }
+
+        /* Collapsible Section Styles (Existing) */
+        .collapsible-header {
+            background-color: #e9ecef;
+            color: var(--primary);
+            padding: 12px 20px;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+            margin-bottom: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.3em;
+            font-weight: 500;
+            transition: background-color 0.2s ease;
+        }
+        .collapsible-header:hover {
+            background-color: #dce4ec;
+        }
+        .collapsible-header::after {
+            content: '▼';
+            font-size: 0.8em;
+            transition: transform 0.2s ease-in-out;
+            color: #495057;
+        }
+        .collapsible-header.active::after {
+             transform: rotate(180deg);
+        }
+        .collapsible-content {
+            padding: 20px;
+            border: 1px solid var(--border);
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+            display: block;
+            background-color: #fff;
+            transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+            overflow: hidden;
+            max-height: 5000px; /* Allow ample space initially */
+        }
+        .collapsible-content.collapsed {
+             max-height: 0;
+             padding-top: 0;
+             padding-bottom: 0;
+             border-width: 0 1px; /* Keep side borders during collapse */
+        }
+
+        /* Summary KPIs Styles (Existing) */
+        .summary .kpis {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f1f3f5;
+            border-radius: 5px;
+            border: 1px solid var(--border);
+        }
+         .summary .kpi-item {
+             background-color: #fff;
+             padding: 10px 15px;
+             border-radius: 4px;
+             border: 1px solid #e9ecef;
+             text-align: center;
+         }
+        .summary .kpi-item .label {
+             font-size: 0.9em;
+             color: var(--text-light);
+             display: block;
+             margin-bottom: 5px;
+        }
+        .summary .kpi-item .value {
+             font-size: 1.4em;
+             font-weight: 600;
+             color: var(--primary);
+         }
+        .summary .kpi-item .value.negative { color: var(--danger); }
+        .summary .kpi-item .value.warning { color: var(--warning); } /* Changed from orange to yellow for KPI consistency */
+
+        /* Main Section & Container Styles (Existing) */
+        main { margin-top: 25px; }
+        section h2.collapsible-header { /* Target section headers specifically */
+            font-size: 1.6em;
+            font-weight: 500;
+        }
+        .chart-container, .table-container, .recommendations-grid-container { /* Added recommendations container */
+            margin-bottom: 35px;
+            padding: 15px;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            background-color: #fdfdff;
+        }
+        .chart-container h3, .table-container h3, .recommendations-grid-container h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #495057;
+            font-size: 1.2em;
+            font-weight: 500;
+        }
+        .chart-container canvas {
+            max-width: 100%;
+            height: auto;
+            max-height: 400px;
+        }
+        .dual-chart-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        /* Table Styles (Existing) */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 8px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+        thead th {
+            background-color: #f1f3f5;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        tbody tr:nth-child(even) { background-color: var(--light); }
+        tbody tr:hover { background-color: #e9ecef; }
+
+        /* Utility & Color Styles (Existing) */
+        .negative { color: var(--danger); font-weight: bold; }
+        .warning { background-color: #fff3cd; color: #856404; }
+        .danger { background-color: #f8d7da; color: #721c24; font-weight: bold; }
+        .low-kpi { background-color: #f8d7da; font-weight: bold; }
+        .mismatch { font-style: italic; color: var(--orange); }
+        .blank { color: #adb5bd; }
+        .text-center { text-align: center; }
+
+        /* EAC/ETC Summary Styles (Existing) */
+        .eac-etc-summary ul { list-style: none; padding: 0; border: 1px solid var(--border); border-radius: 5px; background-color: var(--light); }
+        .eac-etc-summary li { padding: 10px 18px; border-bottom: 1px solid #e9ecef; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+        .eac-etc-summary li:last-child { border-bottom: none; }
+        .eac-etc-summary strong { color: var(--primary); font-weight: 600; margin-right: 10px; }
+        .eac-etc-summary .value { font-weight: bold; text-align: right; }
+        .eac-etc-summary span.details { font-style: italic; color: var(--text-light); font-size: 0.9em; margin-left: 20px; flex-basis: 100%; text-align: right; margin-top: 3px; }
+
+        /* --- NEW Styles for Recommendations Section --- */
+        .recommendations-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); /* Adjust minmax for desired card size */
+            gap: 20px;
+        }
+
+        .recommendation-card {
+            background-color: white;
+            border-radius: 6px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            display: flex; /* Use flex for better vertical alignment */
+            flex-direction: column; /* Stack header/body */
+        }
+
+        .recommendation-header {
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .recommendation-title-area {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .priority-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .high-priority { background-color: var(--danger); }
+        .medium-priority { background-color: var(--orange); } /* Using orange for medium */
+        .low-priority { background-color: var(--success); } /* Example for low */
+
+        .recommendation-title {
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        .priority-badge {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-weight: 500;
+            flex-shrink: 0; /* Prevent badge shrinking */
+        }
+        .high-badge { background-color: #feebee; color: var(--danger); }
+        .medium-badge { background-color: #fff8e1; color: var(--orange); } /* Using orange text */
+        .low-badge { background-color: #eafaf1; color: var(--success); } /* Example for low */
+
+        .recommendation-body {
+            padding: 15px;
+            flex-grow: 1; /* Allow body to take remaining space */
+            display: flex;
+            flex-direction: column;
+        }
+
+        .metrics-row {
+            display: grid; /* Use grid for metrics alignment */
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .metric { } /* No specific flex needed with grid */
+
+        .metric-label {
+            font-size: 12px;
+            color: var(--text-light);
+            margin-bottom: 5px;
+            display: block; /* Ensure label is block */
+        }
+
+        .metric-value {
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        .description {
+            margin-bottom: 15px;
+            color: var(--text);
+            font-size: 14px;
+            flex-grow: 1; /* Allow description to push actions down */
+        }
+
+        .benchmark {
+            background-color: var(--light);
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: var(--text-light);
+            margin-bottom: 15px;
+            border: 1px solid var(--border);
+        }
+        .benchmark strong { color: var(--text); }
+
+        .action-row {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: auto; /* Push actions to the bottom */
+        }
+         .btn { /* Shared button style */
+            padding: 6px 14px; /* Slightly smaller padding */
+            border-radius: 4px;
+            font-weight: 500;
+            cursor: pointer;
+            font-size: 13px;
+            border: none;
+            text-align: center;
+        }
+        .btn-primary { background-color: var(--primary); color: white; }
+        .btn-secondary { background-color: var(--light); color: var(--text); border: 1px solid var(--border); }
+        /* --- End Recommendations Styles --- */
+
+        /* Responsive adjustments if needed */
+        @media (max-width: 768px) {
+             .recommendations-grid {
+                grid-template-columns: 1fr; /* Single column on smaller screens */
+            }
+        }
+
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <header>
+            <h1>Final Project Performance Report</h1>
+            <h2>Project: Trehan IRIS Experience Center, Gurgaon Sector 80</h2>
+            <p><strong>Reporting Period:</strong> As of May 15, 2025 (Hypothetical Date)</p>
+            <p><strong>Report Generation Date:</strong> October 26, 2023</p>
+            <p><strong>Primary Interior Contractor (as per BOQ Ref):</strong> Swarn Interior</p>
+        </header>
+
+        <section class="assumptions">
+            <h2 class="collapsible-header active">Key Assumptions & Context</h2>
+            <div class="collapsible-content">
+                <ul>
+                    <li>Project status reflects hypothetical date May 15, 2025.</li>
+                    <li>Part 1 uses limited baseline data; Part 2 uses assumed actuals for illustration.</li>
+                    <li>Currency: Indian Rupees (₹), converted from source text's assumed Euro values for consistency in Part 2 calculations (CPI/SPI are illustrative).</li>
+                    <li>BOQ Ref: Swarn Interior's BOQ used for scope/context.</li>
+                    <li>PV/Baseline comparisons assume linear progress unless noted otherwise.</li>
+                    <li>Total Assumed Project Budget (<abbr title="Budget at Completion">BAC</abbr>) for calculations: ₹850,000.</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="summary">
+            <h2 class="collapsible-header active">Executive Summary & Key KPIs</h2>
+            <div class="collapsible-content">
+                <p>As of May 15, 2025, the project faces significant challenges. It is considerably behind schedule (Overall <abbr title="Schedule Performance Index">SPI</abbr> ~0.74) and significantly over budget based on work completed (Overall <abbr title="Cost Performance Index">CPI</abbr> ~0.90, using assumed costs). Major delays (~45 days overall) persist across critical phases (High Side, Facade, Plumbing, Long Lead). Key drivers include labor availability, design issues/changes, and material procurement delays, leading to lower-than-planned productivity. Forecasts (<abbr title="Estimate at Completion">EAC</abbr> ~₹944,444 vs. assumed <abbr title="Budget at Completion">BAC</abbr> ₹850,000) indicate substantial cost overruns. Urgent corrective actions are needed.</p>
+                 <div class="kpis">
+                     <div class="kpi-item">
+                         <span class="label">Overall <abbr title="Schedule Performance Index">SPI</abbr></span>
+                         <span class="value warning">0.74</span>
+                     </div>
+                     <div class="kpi-item">
+                         <span class="label">Overall <abbr title="Cost Performance Index">CPI</abbr></span>
+                         <span class="value warning">0.90</span>
+                     </div>
+                     <div class="kpi-item">
+                         <span class="label">Est. Project Delay</span>
+                         <span class="value negative">~45 days</span>
+                     </div>
+                     <div class="kpi-item">
+                         <span class="label">Assumed <abbr title="Budget at Completion">BAC</abbr></span>
+                         <span class="value">₹850,000</span>
+                     </div>
+                    <div class="kpi-item">
+                         <span class="label"><abbr title="Estimate at Completion">EAC</abbr></span>
+                         <span class="value negative">~₹944,444</span>
+                     </div>
+                     <div class="kpi-item">
+                         <span class="label"><abbr title="Variance at Completion">VAC</abbr></span>
+                         <span class="value negative">~₹-94,444</span>
+                     </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================== NEW RECOMMENDATIONS SECTION ======================== -->
+        <section id="recommendations">
+            <h2 class="collapsible-header active">Insights & Recommendations</h2>
+            <div class="collapsible-content">
+                <div class="recommendations-grid">
+
+                    <!-- Recommendation 1: Address Plumbing Performance -->
+                    <div class="recommendation-card">
+                        <div class="recommendation-header">
+                            <div class="recommendation-title-area">
+                                <div class="priority-dot high-priority"></div>
+                                <span class="recommendation-title">Improve Plumbing Productivity & Schedule</span>
+                            </div>
+                            <span class="priority-badge high-badge">High Priority</span>
+                        </div>
+                        <div class="recommendation-body">
+                            <div class="metrics-row">
+                                <div class="metric">
+                                    <div class="metric-label">Affected CPI/SPI</div>
+                                    <div class="metric-value"><span class="negative">0.80</span> / <span class="negative">0.40</span></div>
+                                </div>
+                                <div class="metric">
+                                    <div class="metric-label">Potential Cost Impact</div>
+                                    <div class="metric-value"><span class="negative">₹-4,000</span> (CV)</div>
+                                </div>
+                                <div class="metric">
+                                    <div class="metric-label">Category</div>
+                                    <div class="metric-value">MEP / Operations</div>
+                                </div>
+                            </div>
+                            <div class="description">
+                                Plumbing works (ID 48) show critical schedule delays (SPI 0.40) and cost overruns (CPI 0.80). Root causes include design issues (Task 52, 54, 86) and weather (Task 51, 77).
+                                <strong>Action:</strong> Prioritize design clarifications with BuildWell MEP & Classic Tiles, ensure material availability, review labor deployment, and implement weather mitigation if possible.
+                            </div>
+                            <div class="benchmark">
+                                <strong>Benchmark:</strong> Target CPI & SPI > 0.95 for critical path activities. Resolve design delays within 2-3 days.
+                            </div>
+                            <div class="action-row">
+                                <button class="btn btn-secondary">View Related Tasks</button>
+                                <button class="btn btn-primary">Assign Action</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recommendation 2: Expedite Long Lead Items -->
+                    <div class="recommendation-card">
+                        <div class="recommendation-header">
+                            <div class="recommendation-title-area">
+                                <div class="priority-dot high-priority"></div>
+                                <span class="recommendation-title">Mitigate Long Lead Item Delays</span>
+                            </div>
+                            <span class="priority-badge high-badge">High Priority</span>
+                        </div>
+                        <div class="recommendation-body">
+                            <div class="metrics-row">
+                                <div class="metric">
+                                    <div class="metric-label">Affected SPI</div>
+                                    <div class="metric-value"><span class="negative">0.60 - 0.70</span></div>
+                                </div>
+                                 <div class="metric">
+                                    <div class="metric-label">Affected Items</div>
+                                    <div class="metric-value">Chairs, Furniture, Carpet, UPS</div>
+                                </div>
+                                <div class="metric">
+                                    <div class="metric-label">Category</div>
+                                    <div class="metric-value">Procurement / Logistics</div>
+                                </div>
+                            </div>
+                            <div class="description">
+                                Multiple long lead items (Summaries 20, 118; Tasks 21, 24) are significantly behind schedule (SPI < 0.7) due to material and labor delays (Table 3, 6). This impacts final fit-out and commissioning.
+                                <strong>Action:</strong> Escalate with vendors (e.g., Comfort Seating, PowerTech Systems), confirm delivery dates, expedite logistics, and ensure site is ready for installation upon arrival.
+                            </div>
+                            <div class="benchmark">
+                                <strong>Benchmark:</strong> Delivery lead times met +/- 5 days. Critical items tracked weekly.
+                            </div>
+                            <div class="action-row">
+                                <button class="btn btn-secondary">View Vendor Details</button>
+                                <button class="btn btn-primary">Initiate Follow-up</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recommendation 3: Labor Productivity Analysis -->
+                    <div class="recommendation-card">
+                        <div class="recommendation-header">
+                            <div class="recommendation-title-area">
+                                <div class="priority-dot medium-priority"></div>
+                                <span class="recommendation-title">Investigate Labor Productivity Variances</span>
+                            </div>
+                            <span class="priority-badge medium-badge">Medium Priority</span>
+                        </div>
+                        <div class="recommendation-body">
+                            <div class="metrics-row">
+                                <div class="metric">
+                                    <div class="metric-label">Delay Root Cause</div>
+                                    <div class="metric-value">Labor (18 days)</div>
+                                </div>
+                                <div class="metric">
+                                    <div class="metric-label">Potential Efficiency Gain</div>
+                                    <div class="metric-value">Target +10-15%</div>
+                                </div>
+                                <div class="metric">
+                                    <div class="metric-label">Category</div>
+                                    <div class="metric-value">Operations / HR</div>
+                                </div>
+                            </div>
+                            <div class="description">
+                                Labor delays are a major contributor (18 days, Table 6). Productivity inferences (Table 9, 14) and manpower mismatches (Table 7) suggest inefficiencies (e.g., Facade, Gyp Framing, Plumbing).
+                                <strong>Action:</strong> Conduct targeted review of tasks with high labor delay/variance. Validate assigned skill sets, address bottlenecks (waiting time, tools), and compare actual vs planned output more closely.
+                            </div>
+                            <div class="benchmark">
+                                <strong>Benchmark:</strong> Actual Manpower Variance < +/- 10%. Productivity rates within 15% of baseline estimates.
+                            </div>
+                            <div class="action-row">
+                                <button class="btn btn-secondary">View Productivity Data</button>
+                                <button class="btn btn-primary">Schedule Review</button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div> <!-- End recommendations-grid -->
+            </div> <!-- End collapsible-content -->
+        </section>
+        <!-- ===================== END RECOMMENDATIONS SECTION ===================== -->
+
+
+        <main>
+            <section id="part1">
+                <h2 class="collapsible-header">Part 1: Analysis based on Limited Baseline Data</h2>
+                <div class="collapsible-content collapsed">
+                    <!-- Table 1: Remains a table due to nature of data -->
+                    <div class="table-container">
+                        <h3>Table 1: Baseline Schedule Interpretation & Potential Variance Notes</h3>
+                         <p>(Highlights inconsistencies noted in original data)</p>
+                        <table>
+                            <!-- Table 1 Content Here (as before) -->
+                             <thead>
+                                <tr><th>ID</th><th>Name</th><th>Baseline Start</th><th>Baseline Finish</th><th>Duration</th><th>Delay</th><th>Notes on Potential Variance / Inconsistency</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>4</td><td>Project Understanding call</td><td>01-Dec-24</td><td>05-Feb-25</td><td>1 day</td><td></td><td class="warning">Baseline Finish date is far beyond Baseline Start + Duration.</td></tr>
+                                <tr><td>6</td><td>Layout and Look and Feel</td><td>01-Feb-25</td><td>05-Feb-25</td><td>12.78 days</td><td></td><td class="warning">Duration seems inconsistent with Start/Finish spread.</td></tr>
+                                <tr><td>7</td><td>Preparation of DBR...</td><td>06-Feb-25</td><td>07-Feb-25</td><td>4 days</td><td class="negative">2</td><td>2 days delay reported. Baseline Finish likely slipped.</td></tr>
+                                <tr><td>8</td><td>Approval on design brief report</td><td>08-Feb-25</td><td>07-Mar-25</td><td>2 days</td><td></td><td class="warning">Baseline Finish date is far beyond Baseline Start + Duration.</td></tr>
+                                <tr><td>11</td><td>Finalisation of GC vendor</td><td>03-Mar-25</td><td>08-Mar-25</td><td>1 day</td><td class="negative">1</td><td>1 day delay reported.</td></tr>
+                                <tr><td>12</td><td>Look & Feel sample...</td><td>06-Mar-25</td><td>30-Apr-25</td><td>5.11 days</td><td></td><td class="warning">Baseline Finish date is far beyond Baseline Start + Duration.</td></tr>
+                                <tr><td>15</td><td>Transformer</td><td>06-Mar-25</td><td>22-Mar-25</td><td>18 days</td><td class="negative">4</td><td>4 days delay reported (Material delay).</td></tr>
+                                <tr><td>13</td><td>High Side Works (Example)</td><td>06-Mar-25</td><td>22-Mar-25</td><td>47.89 days</td><td></td><td class="danger">Major inconsistency (Dates vs Duration).</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Chart 2: Progress Chart -->
+                    <div class="chart-container">
+                        <h3>Chart 2: Progress (%) of Tasks Past Baseline Finish (as of May 15, 2025)</h3>
+                        <canvas id="progressChart"></canvas>
+                        <p class="text-center" style="margin-top:10px;"><small>Tasks shown were expected to be complete by May 15, 2025, based on baseline finish dates.</small></p>
+                    </div>
+
+                    <!-- Chart 3 & 5: Delays -->
+                     <div class="dual-chart-container">
+                         <div class="chart-container">
+                            <h3>Chart 3: Explicitly Reported Delay Days per Task</h3>
+                            <canvas id="taskDelayChart"></canvas>
+                         </div>
+                         <div class="chart-container">
+                            <h3>Chart 5: Total Reported Delay Days by Category</h3>
+                            <canvas id="categoryDelayChart"></canvas>
+                         </div>
+                     </div>
+
+                     <!-- Chart 6: Delay Root Cause -->
+                     <div class="dual-chart-container">
+                         <div class="chart-container">
+                            <h3>Chart 6a: Frequency of Delay Root Causes</h3>
+                            <canvas id="delayCauseFrequencyChart"></canvas>
+                         </div>
+                          <div class="chart-container">
+                            <h3>Chart 6b: Total Delay Days by Root Cause</h3>
+                            <canvas id="delayCauseDaysChart"></canvas>
+                         </div>
+                     </div>
+
+                    <!-- Chart 7: Manpower Variance -->
+                    <div class="chart-container">
+                        <h3>Chart 7: Planned vs. Actual Manpower (Snapshot)</h3>
+                        <canvas id="manpowerVarianceChart"></canvas>
+                        <p class="text-center" style="margin-top:10px;"><small>Note: Includes tasks with mismatches or missing data as per original report.</small></p>
+                    </div>
+
+                    <!-- Table 9: Productivity Inference -->
+                    <div class="table-container">
+                        <h3>Table 9: Limited Productivity Inference Examples (Highly Speculative)</h3>
+                         <table>
+                            <!-- Table 9 Content Here (as before) -->
+                            <thead>
+                                <tr><th>Task ID</th><th>Task Name</th><th>BOQ Item Context</th><th>Inference based on Source Text Analysis</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>13</td><td>High Side Works (Masonry)</td><td>1.1 (230mm Brickwork)</td><td class="warning">Significantly delayed. Resources vs progress suggests low actual productivity, larger scope, or issues.</td></tr>
+                                <tr><td>32</td><td>Gyp Partition Framing</td><td>5.1.1 (100mm Partition)</td><td class="warning">Completed late despite planned manpower. Suggests actual productivity lower than assumed or interruptions.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div> <!-- End Part 1 Collapsible Content -->
+            </section>
+
+            <section id="part2">
+                <h2 class="collapsible-header">Part 2: Performance Analysis based on Assumed Actual Data</h2>
+                 <div class="collapsible-content collapsed">
+                    <p>(Utilizing assumed Actual Start/Finish, Costs (<abbr title="Actual Cost">AC</abbr>), <abbr title="Earned Value">EV</abbr>, Hours from source text. Illustrative examples converted to ₹.)</p>
+
+                    <!-- Chart 10: Finish Variance -->
+                    <div class="chart-container">
+                        <h3>Chart 10: Schedule Finish Variance (Days) for Key Tasks</h3>
+                        <canvas id="finishVarianceChart"></canvas>
+                         <p class="text-center" style="margin-top:10px;"><small>Negative values indicate days late compared to Baseline Finish. Bars for 'Ongoing' tasks are omitted.</small></p>
+                    </div>
+
+                    <!-- Chart 11: Duration Variance -->
+                     <div class="chart-container">
+                        <h3>Chart 11: Planned vs. Actual Duration (Completed Tasks)</h3>
+                        <canvas id="durationVarianceChart"></canvas>
+                         <p class="text-center" style="margin-top:10px;"><small>Shows variance for tasks reported as completed in the assumed data.</small></p>
+                    </div>
+
+                     <!-- Chart 15: CPI/SPI -->
+                     <div class="dual-chart-container">
+                         <div class="chart-container">
+                             <h3>Chart 15a: Cost Performance Index (<abbr title="Cost Performance Index">CPI</abbr>) by Task/Phase</h3>
+                             <canvas id="cpiChart"></canvas>
+                             <p class="text-center" style="margin-top:10px;"><small>CPI < 1 indicates cost overrun for work done.</small></p>
+                         </div>
+                         <div class="chart-container">
+                             <h3>Chart 15b: Schedule Performance Index (<abbr title="Schedule Performance Index">SPI</abbr>) by Task/Phase</h3>
+                             <canvas id="spiChart"></canvas>
+                              <p class="text-center" style="margin-top:10px;"><small>SPI < 1 indicates behind schedule.</small></p>
+                         </div>
+                     </div>
+                     <div class="chart-container">
+                        <h3>Chart 15c: <abbr title="Cost Performance Index">CPI</abbr> vs <abbr title="Schedule Performance Index">SPI</abbr> Scatter Plot</h3>
+                        <canvas id="cpiSpiScatterChart"></canvas>
+                        <p class="text-center" style="margin-top:10px;"><small>Ideal quadrant is Top-Right (CPI > 1, SPI > 1). Current project average is in Bottom-Left.</small></p>
+                     </div>
+
+                    <!-- Chart 16: Cost Variance -->
+                    <div class="chart-container">
+                        <h3>Chart 16: Cost Variance (<abbr title="Cost Variance">CV</abbr> in ₹) by Task/Phase</h3>
+                        <canvas id="costVarianceChart"></canvas>
+                        <p class="text-center" style="margin-top:10px;"><small><abbr title="Cost Variance">CV</abbr> = <abbr title="Earned Value">EV</abbr> - <abbr title="Actual Cost">AC</abbr>. Negative values indicate cost overrun for work performed.</small></p>
+                    </div>
+
+                    <!-- Table 17: EAC/ETC Summary -->
+                    <div class="eac-etc-summary table-container">
+                        <h3>Table 17: <abbr title="Estimate at Completion">EAC</abbr> / <abbr title="Estimate to Complete">ETC</abbr> Summary</h3>
+                        <ul>
+                            <!-- List items as before -->
+                             <li><strong><abbr title="Budget at Completion">BAC</abbr>:</strong> <span class="value">₹850,000</span> <span class="details">(Assumed Total Project Budget)</span></li>
+                            <li><strong><abbr title="Actual Cost to Date">AC</abbr>:</strong> <span class="value">₹592,600</span> <span class="details">(Sum of Assumed AC for Sampled Tasks)</span></li>
+                            <li><strong><abbr title="Earned Value to Date">EV</abbr>:</strong> <span class="value">₹531,420</span> <span class="details">(Sum of Assumed EV for Sampled Tasks)</span></li>
+                            <li><strong>Overall <abbr title="Cost Performance Index">CPI</abbr> (Sampled):</strong> <span class="value warning">0.90</span> <span class="details">(EV / AC)</span></li>
+                            <li><strong><abbr title="Estimate at Completion">EAC</abbr>:</strong> <span class="value negative">~₹944,444</span> <span class="details">(BAC / CPI)</span></li>
+                            <li><strong><abbr title="Estimate to Complete">ETC</abbr>:</strong> <span class="value">~₹351,844</span> <span class="details">(EAC - AC)</span></li>
+                            <li><strong><abbr title="Variance at Completion">VAC</abbr>:</strong> <span class="value negative">~₹-94,444</span> <span class="details">(BAC - EAC)</span></li>
+                        </ul>
+                    </div>
+
+                    <!-- Other Part 2 Tables -->
+                     <div class="table-container">
+                        <h3>Table 12: Actual Machine Hour Usage (Assumed)</h3>
+                         <table>
+                            <!-- Table 12 content as before -->
+                             <thead><tr><th>ID</th><th>Name</th><th>Machine Planned</th><th>Actual Hours</th><th>Notes</th></tr></thead>
+                            <tbody>
+                                <tr><td>13</td><td>High Side Works</td><td>Mixer/1</td><td>200</td><td>Significant usage. No plan data.</td></tr>
+                                <tr><td>20</td><td>Long lead Delivery</td><td>Forklift/1?</td><td>40</td><td>Likely deliveries. No plan data.</td></tr>
+                                <tr><td>28</td><td>Civil & Int</td><td>Mixer/1</td><td>150</td><td>Usage consistent. No plan data.</td></tr>
+                                <tr><td>77</td><td>HVAC</td><td>Scissor Lift/1</td><td>100</td><td>Usage consistent. No plan data.</td></tr>
+                                <tr><td>118</td><td>Long Lead Items</td><td>Forklift/1?</td><td>150</td><td>Significant hours. No plan data.</td></tr>
+                            </tbody>
+                        </table>
+                     </div>
+                      <div class="table-container">
+                        <h3>Table 14: Actual Resource Productivity Examples (Assumed)</h3>
+                        <table>
+                            <!-- Table 14 content as before -->
+                            <thead><tr><th>ID</th><th>Name</th><th>Actual Output</th><th>Unit</th><th>Actual Labor Hrs</th><th>Calc. Productivity</th><th>Orig. Assumed</th><th>Notes</th></tr></thead>
+                            <tbody>
+                                <tr><td>18</td><td>Facade glass</td><td>30</td><td>sqm</td><td>800</td><td class="danger">0.0375 sqm/hr</td><td>~1.25</td><td class="danger">Extremely low vs assumed.</td></tr>
+                                <tr><td>32</td><td>Gyp Framing</td><td>264.33</td><td>m²</td><td>720</td><td class="warning">0.367 m²/hr</td><td>~1.25</td><td class="warning">Lower than assumption.</td></tr>
+                                <tr><td>51</td><td>GI/CI Pipes</td><td>199.03</td><td class="mismatch">m²/m ?</td><td>400</td><td class="warning">0.5 /hr</td><td>~2.5</td><td class="danger">Unit mismatch? Lower prod.</td></tr>
+                                <tr><td>86</td><td>Install Drain pipe</td><td>1</td><td>System</td><td>120</td><td class="danger">0.008 sys/hr</td><td>N/A</td><td class="danger">Took much longer. Low prod.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                 </div> <!-- End Part 2 Collapsible Content -->
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // Collapsible Sections Logic (Updated to include #recommendations)
+        document.querySelectorAll('.collapsible-header').forEach(header => {
+            const content = header.nextElementSibling;
+            if (!header.classList.contains('active')) {
+                 content.classList.add('collapsed');
+                 content.style.maxHeight = '0';
+                 content.style.paddingTop = '0';
+                 content.style.paddingBottom = '0';
+                 content.style.borderWidth = '0 1px';
+            } else {
+                 content.style.maxHeight = content.scrollHeight + "px";
+            }
+
+            header.addEventListener('click', () => {
+                header.classList.toggle('active');
+                const isActive = header.classList.contains('active');
+                if (isActive) {
+                    content.classList.remove('collapsed');
+                    content.style.borderWidth = '0 1px 1px 1px';
+                    content.style.paddingTop = '20px';
+                    content.style.paddingBottom = '20px';
+                    content.style.maxHeight = content.scrollHeight + "px";
+                } else {
+                    content.style.maxHeight = '0';
+                    setTimeout(() => {
+                        if (!header.classList.contains('active')) {
+                            content.classList.add('collapsed');
+                            content.style.paddingTop = '0';
+                            content.style.paddingBottom = '0';
+                            content.style.borderWidth = '0 1px';
+                        }
+                    }, 300);
+                }
+            });
+        });
+
+        // Chart Colors (Existing)
+        const chartColors = {
+            red: 'rgba(220, 53, 69, 0.7)', orange: 'rgba(253, 126, 20, 0.7)', yellow: 'rgba(255, 193, 7, 0.7)',
+            green: 'rgba(40, 167, 69, 0.7)', blue: 'rgba(0, 123, 255, 0.7)', teal: 'rgba(32, 201, 151, 0.7)',
+            grey: 'rgba(108, 117, 125, 0.7)', lightBlue: 'rgba(117, 185, 235, 0.7)', darkRed: 'rgba(179, 41, 54, 0.7)',
+            darkBlue: 'rgba(0, 86, 179, 0.7)'
+        };
+        const borderColors = {
+             red: 'rgb(220, 53, 69)', orange: 'rgb(253, 126, 20)', yellow: 'rgb(255, 193, 7)', green: 'rgb(40, 167, 69)',
+             blue: 'rgb(0, 123, 255)', teal: 'rgb(32, 201, 151)', grey: 'rgb(108, 117, 125)', lightBlue: 'rgb(117, 185, 235)',
+             darkRed: 'rgb(179, 41, 54)', darkBlue: 'rgb(0, 86, 179)'
+        };
+
+        // --- Chart Data & Initialization (Existing - No Changes Needed Here) ---
+
+        // Chart 2: Progress Chart
+        const progressCtx = document.getElementById('progressChart')?.getContext('2d');
+        if (progressCtx) {
+            // Chart definition as before...
+             new Chart(progressCtx, {
+                type: 'bar',
+                data: { /* Data as before */
+                    labels: ['13 High Side', '18 Facade', '20 Long Lead (Sum)', '21 UPS', '22 Carpet Ord', '23 Furn. Ord', '24 Chairs Ord', '28 Civil/Int (Sum)', '48 Plumbing (Sum)', '61 Electrical (Sum)', '77 HVAC (Sum)', '97 IT (Sum)', '105 Security (Sum)', '111 AV (Sum)', '118 Long Lead (Sum2)'],
+                    datasets: [{
+                        label: 'Actual Progress (%)',
+                        data: [80, 60, 70, 95, 90, 70, 60, 90, 40, 80, 60, 90, 70, 80, 50],
+                         backgroundColor: (context) => { const value = context.raw; return value < 75 ? chartColors.red : (value < 95 ? chartColors.yellow : chartColors.green); },
+                         borderColor: (context) => { const value = context.raw; return value < 75 ? borderColors.red : (value < 95 ? borderColors.yellow : borderColors.green); },
+                        borderWidth: 1
+                    }, { label: 'Target Progress (%)', data: Array(15).fill(100), backgroundColor: chartColors.grey, borderColor: borderColors.grey, borderWidth: 1 }]
+                }, options: { /* Options as before */ scales: { y: { beginAtZero: true, max: 100, title: { display: true, text: 'Progress (%)' } } }, plugins: { legend: { display: true }, title: { display: false } }, responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        // Chart 3: Task Delays
+        const taskDelayCtx = document.getElementById('taskDelayChart')?.getContext('2d');
+        if (taskDelayCtx) {
+             // Chart definition as before...
+              new Chart(taskDelayCtx, {
+                type: 'bar',
+                data: { /* Data as before */
+                    labels: ['7 Prep DBR', '11 Finalise GC', '15 Transformer', '18 Facade', '21 UPS Ord', '24 Chairs Ord', '28 Civil/Int', '30 Mob', '32 Gyp Frame', '51 Pipes', '54 Tiles', '63 Conduit', '77 HVAC', '86 Drain Pipe', '106 Sec Mob', '118 Long Lead'],
+                    datasets: [{ label: 'Reported Delay (days)', data: [2, 1, 4, 2, 4, 1, 6, 1, 2, 2, 3, 5, 2, 2, 5, 3], backgroundColor: chartColors.red, borderColor: borderColors.red, borderWidth: 1 }]
+                }, options: { /* Options as before */ scales: { y: { beginAtZero: true, title: { display: true, text: 'Delay (days)' } } }, indexAxis: 'y', plugins: { legend: { display: false }, title: { display: false } }, responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        // Chart 5: Category Delays
+        const categoryDelayCtx = document.getElementById('categoryDelayChart')?.getContext('2d');
+        if (categoryDelayCtx) {
+             // Chart definition as before...
+             new Chart(categoryDelayCtx, {
+                type: 'doughnut',
+                data: { /* Data as before */
+                    labels: ['Design', 'Tendering', 'High Side (Power/Glass)', 'Long Lead (UPS/Chair)', 'Civil/Int', 'Plumbing', 'Electrical', 'HVAC', 'Security/IT', 'Long Lead (Sum)', 'Unassigned'],
+                    datasets: [{ label: 'Total Delay (days)', data: [6, 1, 6, 5, 8, 9, 5, 4, 5, 3, 1], backgroundColor: [chartColors.orange, chartColors.grey, chartColors.blue, chartColors.teal, chartColors.darkBlue, chartColors.lightBlue, chartColors.yellow, chartColors.green, chartColors.darkRed, chartColors.red, chartColors.grey] }]
+                }, options: { /* Options as before */ plugins: { legend: { position: 'bottom' }, title: { display: false } }, responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        // Chart 6a: Delay Cause Frequency
+        const delayCauseFreqCtx = document.getElementById('delayCauseFrequencyChart')?.getContext('2d');
+        if (delayCauseFreqCtx) {
+             // Chart definition as before...
+              new Chart(delayCauseFreqCtx, {
+                type: 'pie',
+                data: { /* Data as before */
+                    labels: ['Labour delay', 'Design', 'Material delay', 'Weather', '(Blank/Unknown)'],
+                    datasets: [{ label: 'Frequency', data: [5, 5, 4, 2, 1], backgroundColor: [chartColors.red, chartColors.orange, chartColors.blue, chartColors.lightBlue, chartColors.grey] }]
+                }, options: { /* Options as before */ plugins: { legend: { position: 'bottom' }, title: { display: false } }, responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        // Chart 6b: Delay Cause Days
+        const delayCauseDaysCtx = document.getElementById('delayCauseDaysChart')?.getContext('2d');
+        if (delayCauseDaysCtx) {
+             // Chart definition as before...
+              new Chart(delayCauseDaysCtx, {
+                type: 'pie',
+                data: { /* Data as before */
+                    labels: ['Labour delay', 'Design', 'Material delay', 'Weather', '(Blank/Unknown)'],
+                    datasets: [{ label: 'Total Delay Days', data: [18, 9, 13, 4, 1], backgroundColor: [chartColors.red, chartColors.orange, chartColors.blue, chartColors.lightBlue, chartColors.grey] }]
+                }, options: { /* Options as before */ plugins: { legend: { position: 'bottom' }, title: { display: false } }, responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+         // Chart 7: Manpower Variance
+         const manpowerVarianceCtx = document.getElementById('manpowerVarianceChart')?.getContext('2d');
+         if (manpowerVarianceCtx) {
+             // Chart definition as before...
+              new Chart(manpowerVarianceCtx, {
+                 type: 'bar',
+                 data: { /* Data as before */
+                     labels: ['13 Mason', '13 Carp.', '18 Carp.', '24 Labor', '34 Carp.', '37 Carp.', '40 Painter', '43 Carp.', '46 Carp.', '49 Plumb.', '55 TileSet(?)', '59 Plumb.', '64 Elec.', '71 Elec.', '83 HVAC Inst.', '94 UPS Del(?)', '134 Commis.(?)'],
+                     datasets: [ { label: 'Planned Labor', data: [1, 1, 1, 1, 1, 2, 4, 14, 2, 1, 13, 13, 1, 1, 2, 1, 2], backgroundColor: chartColors.blue, borderColor: borderColors.blue, borderWidth: 1 }, { label: 'Actual Labor', data: [2, 1, 2, 2, 2, 4, 7, 19, 4, 2, 19, 15, 2, 2, 5, 2, 6], backgroundColor: chartColors.orange, borderColor: borderColors.orange, borderWidth: 1 }]
+                 }, options: { /* Options as before */ scales: { y: { beginAtZero: true, title: { display: true, text: 'Number of Workers' } } }, plugins: { legend: { display: true }, title: { display: false } }, responsive: true, maintainAspectRatio: false }
+             });
+         }
+
+        // Chart 10: Finish Variance
+        const finishVarianceCtx = document.getElementById('finishVarianceChart')?.getContext('2d');
+        if (finishVarianceCtx) {
+             // Chart definition as before...
+             new Chart(finishVarianceCtx, {
+                type: 'bar',
+                data: { /* Data as before */
+                    labels: ['7 Prep DBR', '11 Finalise GC', '15 Transformer', '32 Gyp Frame', '51 Pipes', '54 Tiles', '63 Conduit', '86 Drain Pipe', '106 Sec Mob'],
+                    datasets: [{ label: 'Finish Variance (days)', data: [-6, -1, -19, -4, -4, -6, -18, -4, -7], backgroundColor: chartColors.red, borderColor: borderColors.red, borderWidth: 1 }]
+                }, options: { /* Options as before */ scales: { y: { title: { display: true, text: 'Days Late (-ve)' } } }, plugins: { legend: { display: false }, title: { display: false } }, responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        // Chart 11: Duration Variance
+        const durationVarianceCtx = document.getElementById('durationVarianceChart')?.getContext('2d');
+        if (durationVarianceCtx) {
+             // Chart definition as before...
+             new Chart(durationVarianceCtx, {
+                 type: 'bar',
+                 data: { /* Data as before */
+                    labels: ['7 Prep DBR', '11 Finalise GC', '15 Transformer', '32 Gyp Frame', '51 Pipes', '54 Tiles', '63 Conduit', '86 Drain Pipe', '106 Sec Mob'],
+                    datasets: [ { label: 'Planned Duration (days)', data: [4, 1, 18, 10, 7, 6, 12, 3, 7], backgroundColor: chartColors.blue, borderColor: borderColors.blue, borderWidth: 1 }, { label: 'Actual Duration (days)', data: [6, 2, 26, 11, 9, 6, 14, 8, 8], backgroundColor: chartColors.orange, borderColor: borderColors.orange, borderWidth: 1 } ]
+                 }, options: { /* Options as before */ scales: { y: { beginAtZero: true, title: { display: true, text: 'Duration (days)' } } }, plugins: { legend: { display: true }, title: { display: false } }, responsive: true, maintainAspectRatio: false }
+             });
+        }
+
+        // Chart 15a: CPI
+        const cpiCtx = document.getElementById('cpiChart')?.getContext('2d');
+        if (cpiCtx) {
+            // Chart definition as before...
+            new Chart(cpiCtx, {
+                 type: 'bar',
+                 data: { /* Data as before */
+                    labels: ['2 Pre Con', '7 DBR', '11 GC', '13 High Side', '15 Transf', '18 Facade', '20 LLead', '21 UPS', '24 Chairs', '27 Const.', '28 Civil', '32 Gyp', '48 Plumb', '61 Elec', '77 HVAC', '97 IT', '105 Sec', '111 AV', '118 LLead2', 'TOT Sample'],
+                    datasets: [{ label: 'CPI', data: [0.94, 0.89, 0.80, 0.78, 0.96, 0.77, 0.88, 0.97, 0.87, 0.90, 0.96, 0.91, 0.80, 0.96, 0.93, 0.96, 0.93, 0.96, 0.91, 0.90], backgroundColor: (context) => context.raw < 1.0 ? chartColors.red : chartColors.green, borderColor: (context) => context.raw < 1.0 ? borderColors.red : borderColors.green, borderWidth: 1 }]
+                 }, options: { /* Options with Tooltips as before */ scales: { y: { beginAtZero: false, title: { display: true, text: 'CPI (EV/AC)' } } }, plugins: { legend: { display: false }, title: { display: false }, tooltip: { callbacks: { label: function(context) { let label = context.dataset.label || ''; if (label) { label += ': '; } if (context.parsed.y !== null) { label += context.parsed.y.toFixed(2); label += (context.parsed.y < 1.0 ? ' (Over Budget)' : ' (On/Under Budget)'); } return label; } } } }, responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        // Chart 15b: SPI
+        const spiCtx = document.getElementById('spiChart')?.getContext('2d');
+        if (spiCtx) {
+             // Chart definition as before...
+             new Chart(spiCtx, {
+                 type: 'bar',
+                 data: { /* Data as before */
+                    labels: ['2 Pre Con', '7 DBR', '11 GC', '13 High Side', '15 Transf', '18 Facade', '20 LLead', '21 UPS', '24 Chairs', '27 Const.', '28 Civil', '32 Gyp', '48 Plumb', '61 Elec', '77 HVAC', '97 IT', '105 Sec', '111 AV', '118 LLead2', 'TOT Sample'],
+                    datasets: [{ label: 'SPI', data: [0.93, 1.00, 1.00, 0.80, 1.00, 0.60, 0.70, 0.95, 0.60, 0.75, 0.90, 1.00, 0.40, 0.80, 0.76, 0.90, 0.70, 0.86, 0.60, 0.74], backgroundColor: (context) => context.raw < 1.0 ? chartColors.orange : chartColors.green, borderColor: (context) => context.raw < 1.0 ? borderColors.orange : borderColors.green, borderWidth: 1 }]
+                 }, options: { /* Options with Tooltips as before */ scales: { y: { beginAtZero: false, title: { display: true, text: 'SPI (EV/PV)' } } }, plugins: { legend: { display: false }, title: { display: false }, tooltip: { callbacks: { label: function(context) { let label = context.dataset.label || ''; if (label) { label += ': '; } if (context.parsed.y !== null) { label += context.parsed.y.toFixed(2); label += (context.parsed.y < 1.0 ? ' (Behind Schedule)' : ' (On/Ahead Schedule)'); } return label; } } } }, responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+         // Chart 15c: CPI vs SPI Scatter Plot
+         const cpiSpiScatterCtx = document.getElementById('cpiSpiScatterChart')?.getContext('2d');
+         if (cpiSpiScatterCtx) {
+             // Scatter data as before
+             const scatterData = [ { x: 0.93, y: 0.94, label: '2 Pre Con' }, { x: 1.00, y: 0.89, label: '7 DBR' }, { x: 1.00, y: 0.80, label: '11 GC' }, { x: 0.80, y: 0.78, label: '13 High Side' }, { x: 1.00, y: 0.96, label: '15 Transf' }, { x: 0.60, y: 0.77, label: '18 Facade' }, { x: 0.70, y: 0.88, label: '20 LLead' }, { x: 0.95, y: 0.97, label: '21 UPS' }, { x: 0.60, y: 0.87, label: '24 Chairs' }, { x: 0.75, y: 0.90, label: '27 Const.' }, { x: 0.90, y: 0.96, label: '28 Civil' }, { x: 1.00, y: 0.91, label: '32 Gyp' }, { x: 0.40, y: 0.80, label: '48 Plumb' }, { x: 0.80, y: 0.96, label: '61 Elec' }, { x: 0.76, y: 0.93, label: '77 HVAC' }, { x: 0.90, y: 0.96, label: '97 IT' }, { x: 0.70, y: 0.93, label: '105 Sec' }, { x: 0.86, y: 0.96, label: '111 AV' }, { x: 0.60, y: 0.91, label: '118 LLead2' }, { x: 0.74, y: 0.90, label: 'TOT Sample', pointRadius: 8, pointStyle: 'star' } ];
+             // Chart definition as before...
+              new Chart(cpiSpiScatterCtx, {
+                 type: 'scatter',
+                 data: { datasets: [{ label: 'Task/Phase Performance', data: scatterData, backgroundColor: (context) => { const point = context.raw; if (point.label === 'TOT Sample') return chartColors.red; return (point.x < 1.0 && point.y < 1.0) ? chartColors.red : (point.x < 1.0 && point.y >= 1.0) ? chartColors.orange : (point.x >= 1.0 && point.y < 1.0) ? chartColors.yellow : chartColors.green; }, pointRadius: 5, hoverRadius: 7 }] },
+                 options: { /* Options with Tooltips & Scales as before */ scales: { x: { type: 'linear', position: 'bottom', title: { display: true, text: 'SPI (Schedule Performance)' }, min: 0.3, max: 1.1 }, y: { type: 'linear', position: 'left', title: { display: true, text: 'CPI (Cost Performance)' }, min: 0.7, max: 1.1 } }, plugins: { legend: { display: false }, title: { display: false }, tooltip: { callbacks: { label: function(context) { const point = context.raw; return `${point.label}: (SPI: ${point.x.toFixed(2)}, CPI: ${point.y.toFixed(2)})`; } } } /*, annotation (requires plugin) */ }, responsive: true, maintainAspectRatio: false }
+             });
+         }
+
+        // Chart 16: Cost Variance
+        const costVarianceCtx = document.getElementById('costVarianceChart')?.getContext('2d');
+         if (costVarianceCtx) {
+            // Chart definition as before...
+            new Chart(costVarianceCtx, {
+                 type: 'bar',
+                 data: { /* Data as before */
+                    labels: ['7 DBR', '11 GC', '13 High Side', '15 Transf', '18 Facade', '20 LLead', '24 Chairs', '28 Civil', '32 Gyp', '48 Plumb', '63 Conduit', '77 HVAC', '105 Sec', '106 Sec Mob', '118 LLead2', 'TOT Sample'],
+                    datasets: [{ label: 'Cost Variance (CV = EV - AC) in ₹', data: [-200, -100, -8000, -900, -1380, -500, -700, -3000, -1000, -4000, -1500, -3000, -2000, -500, -3000, -61180], backgroundColor: (context) => context.raw < 0 ? chartColors.red : chartColors.green, borderColor: (context) => context.raw < 0 ? borderColors.red : borderColors.green, borderWidth: 1 }]
+                 }, options: { /* Options with Tooltips as before */ scales: { y: { title: { display: true, text: 'Cost Variance (₹)' } } }, plugins: { legend: { display: false }, title: { display: false }, tooltip: { callbacks: { label: function(context) { let label = context.dataset.label || ''; if (label) { label = 'CV (₹): '; } if (context.parsed.y !== null) { label += context.parsed.y.toLocaleString('en-IN'); label += (context.parsed.y < 0 ? ' (Over Budget)' : ' (Under Budget)'); } return label; } } } }, responsive: true, maintainAspectRatio: false }
+            });
+         }
+
+    </script>
+</body>
+</html>
