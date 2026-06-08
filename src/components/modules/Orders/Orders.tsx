@@ -118,7 +118,7 @@ interface Order {
   customer_info: {
     customerDetails: {
       mobile: string;
-      customerName: string;
+      fullName: string;
       alternateMobile: string;
     };
   };
@@ -435,7 +435,7 @@ const ReceiptForShare = () => {
                 <div className="space-y-2">
                   <div className="flex items-center">
                     <User className="h-4 w-4 text-slate-400 mr-2" />
-                    <span className="font-medium">{order.customer_info?.customerDetails?.customerName || 'N/A'}</span>
+                    <span className="font-medium">{order.customer_info?.customerDetails?.fullName || 'N/A'}</span>
                   </div>
                   <div className="flex items-center">
                     <Phone className="h-4 w-4 text-slate-400 mr-2" />
@@ -1169,7 +1169,7 @@ queryFn: () =>
                           <div className="flex flex-col">
                             <span className="font-medium">
                               {order.customer_info?.customerDetails
-                                ?.customerName || "N/A"}
+                                ?.fullName || "N/A"}
                             </span>
                             <span className="text-xs text-slate-500">
                               {order.customer_info?.customerDetails?.mobile ||
