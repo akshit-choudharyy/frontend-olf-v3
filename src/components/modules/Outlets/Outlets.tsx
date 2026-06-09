@@ -140,6 +140,12 @@ const Outlets = ({ stationcode }: { stationcode: any }) => {
     null,
   );
   const [isReactivateDialogOpen, setIsReactivateDialogOpen] = useState(false);
+  const [pushResults, setPushResults] = useState<
+    Record<number, { success: boolean; date?: string; error?: string }>
+  >(() => {
+    const stored = localStorage.getItem("pushResults");
+    return stored ? JSON.parse(stored) : {};
+  });
 
   // Query to fetch outlets data
   const {
@@ -325,10 +331,30 @@ const Outlets = ({ stationcode }: { stationcode: any }) => {
   };
 
   // Handle outlet ID click - opens details dialog
-  const handleOutletIdClick = (outlet: Outlet, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent row click
+  const handleOutletIdClick = async (outlet: Outlet, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    // Set outlet data immediately so dialog opens fast
     setSelectedOutletForDetails(outlet);
     setIsOutletDetailsOpen(true);
+
+    // Then fetch fresh vendor data and update the displayed name
+    try {
+      const res = await olfService.get("/rest-vendor", {
+        params: { vendor_id: outlet.vendor_id },
+      });
+      const freshVendor = res?.data?.data?.rows[0];
+      if (freshVendor) {
+        setSelectedOutletForDetails((prev: any) => ({
+          ...prev,
+          vendor_name: freshVendor.vendor_name,
+          phone: freshVendor.vendor_phone,
+          email: freshVendor.vendor_email,
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to fetch fresh vendor data", err);
+    }
   };
 
   // Handle row click
@@ -474,7 +500,6 @@ const Outlets = ({ stationcode }: { stationcode: any }) => {
 
   const handlePushSingleToIRCTC = async (outlet: any, e: React.MouseEvent) => {
     e.stopPropagation();
-    // const isRepush = !!outlet.irctc_application_id;
     try {
       const response = await olfService.post(
         `/restraunt/push/${outlet.station_code}`,
@@ -494,12 +519,20 @@ const Outlets = ({ stationcode }: { stationcode: any }) => {
           email: outlet.email,
           phone: outlet.phone,
           tags: outlet.tags,
-          irctc_application_id: outlet.irctc_application_id, // ✅ key for PATCH vs POST
+          irctc_application_id: outlet.irctc_application_id,
+          promotions: outlet.promotions,
+          charges: outlet.charges || outlet.delivery_charges,
         },
       );
 
       if (response.data.status) {
         const isUpdate = response.data.action === "updated";
+        const now = format(new Date(), "dd MMM yyyy, HH:mm");
+        // ✅ Store success
+        setPushResults((prev) => ({
+          ...prev,
+          [outlet.outlet_id]: { success: true, date: now },
+        }));
         toast.success(
           `${isUpdate ? "🔄 Updated" : "✅ Pushed"}: ${outlet.outlet_name}`,
           {
@@ -513,6 +546,14 @@ const Outlets = ({ stationcode }: { stationcode: any }) => {
         );
         refetch();
       } else {
+        // ✅ Store failure
+        setPushResults((prev) => ({
+          ...prev,
+          [outlet.outlet_id]: {
+            success: false,
+            error: response.data.message || "Push failed",
+          },
+        }));
         toast.error(`❌ Failed: ${outlet.outlet_name}`, { duration: 5000 });
       }
     } catch (error: any) {
@@ -520,7 +561,12 @@ const Outlets = ({ stationcode }: { stationcode: any }) => {
         error?.response?.data?.error?.message ||
         error.message ||
         "Unknown error";
-      toast.error(`❌ ${outlet.outlet_name}: ${msg}`, { duration: 5000 });
+      //  Store error
+      setPushResults((prev) => ({
+        ...prev,
+        [outlet.outlet_id]: { success: false, error: msg },
+      }));
+      toast.error(` ${outlet.outlet_name}: ${msg}`, { duration: 5000 });
     }
   };
   const handlePushAllToIRCTC = async () => {
@@ -540,10 +586,26 @@ const Outlets = ({ stationcode }: { stationcode: any }) => {
 
       const response = await olfService.post(
         `/restraunt/push-all/${stationCode}`,
-        { outlets: filteredOutlets }, // ✅ send ALL, backend handles POST vs PATCH
+        { outlets: filteredOutlets }, //  send ALL, backend handles POST vs PATCH
       );
 
       const { results } = response.data;
+      const newPushResults: Record<
+        number,
+        { success: boolean; date?: string; error?: string }
+      > = {};
+      const now = format(new Date(), "dd MMM yyyy, HH:mm");
+      results.forEach((r: any) => {
+        if (r.status === "success") {
+          newPushResults[r.outletId] = { success: true, date: now };
+        } else {
+          newPushResults[r.outletId] = {
+            success: false,
+            error: r.error || "Push failed",
+          };
+        }
+      });
+      setPushResults((prev) => ({ ...prev, ...newPushResults }));
       const createdItems = results.filter(
         (r: any) => r.status === "success" && r.action === "created",
       );
@@ -554,7 +616,7 @@ const Outlets = ({ stationcode }: { stationcode: any }) => {
 
       if (createdItems.length > 0) {
         const names = createdItems.map((r: any) => r.outletName).join(", ");
-        toast.success(`✅ ${createdItems.length} newly pushed:\n${names}`, {
+        toast.success(` ${createdItems.length} newly pushed:\n${names}`, {
           duration: 5000,
           style: {
             borderRadius: "10px",
@@ -582,7 +644,7 @@ const Outlets = ({ stationcode }: { stationcode: any }) => {
 
       if (failedItems.length > 0) {
         const names = failedItems.map((r: any) => r.outletName).join(", ");
-        toast.error(`❌ ${failedItems.length} failed:\n${names}`, {
+        toast.error(` ${failedItems.length} failed:\n${names}`, {
           duration: 6000,
           style: {
             borderRadius: "10px",
@@ -636,7 +698,10 @@ const Outlets = ({ stationcode }: { stationcode: any }) => {
     };
   };
 
-  // Handle successful edit
+  // Sync pushResults to localStorage for persistence across refreshes
+  useEffect(() => {
+    localStorage.setItem("pushResults", JSON.stringify(pushResults));
+  }, [pushResults]);
   const handleEditSuccess = () => {
     refetch();
   };
@@ -1412,6 +1477,9 @@ const Outlets = ({ stationcode }: { stationcode: any }) => {
                     <TableHead className="font-bold text-gray-1000 border-x border-gray-200 p-3">
                       ACTIONS
                     </TableHead>
+                    <TableHead className="font-bold text-gray-1000 border-x border-gray-200 p-3">
+                      LAST PUSH
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1632,6 +1700,35 @@ const Outlets = ({ stationcode }: { stationcode: any }) => {
 
                         <TableCell className="border-x border-gray-200 p-3">
                           {(() => {
+                            const result = pushResults[outlet.outlet_id];
+                            if (!result) {
+                              return (
+                                <span className="text-xs text-gray-400">—</span>
+                              );
+                            }
+                            if (result.success) {
+                              return (
+                                <div className="flex items-center gap-1 text-green-600">
+                                  <CheckCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                                  <span className="text-xs font-medium">
+                                    {result.date}
+                                  </span>
+                                </div>
+                              );
+                            }
+                            return (
+                              <div className="flex items-start gap-1 text-red-600">
+                                <XCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                                <span className="text-xs leading-snug">
+                                  {result.error}
+                                </span>
+                              </div>
+                            );
+                          })()}
+                        </TableCell>
+
+                        <TableCell className="border-x border-gray-200 p-3">
+                          {(() => {
                             const statusInfo = getStatusInfo(outlet.status);
                             return (
                               <div className="flex flex-wrap gap-1 items-center">
@@ -1713,7 +1810,7 @@ const Outlets = ({ stationcode }: { stationcode: any }) => {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={10} className="h-24 text-center">
+                      <TableCell colSpan={11} className="h-24 text-center">
                         No results found.
                       </TableCell>
                     </TableRow>
