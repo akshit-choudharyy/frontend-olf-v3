@@ -1700,35 +1700,6 @@ const Outlets = ({ stationcode }: { stationcode: any }) => {
 
                         <TableCell className="border-x border-gray-200 p-3">
                           {(() => {
-                            const result = pushResults[outlet.outlet_id];
-                            if (!result) {
-                              return (
-                                <span className="text-xs text-gray-400">—</span>
-                              );
-                            }
-                            if (result.success) {
-                              return (
-                                <div className="flex items-center gap-1 text-green-600">
-                                  <CheckCircle className="h-3.5 w-3.5 flex-shrink-0" />
-                                  <span className="text-xs font-medium">
-                                    {result.date}
-                                  </span>
-                                </div>
-                              );
-                            }
-                            return (
-                              <div className="flex items-start gap-1 text-red-600">
-                                <XCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
-                                <span className="text-xs leading-snug">
-                                  {result.error}
-                                </span>
-                              </div>
-                            );
-                          })()}
-                        </TableCell>
-
-                        <TableCell className="border-x border-gray-200 p-3">
-                          {(() => {
                             const statusInfo = getStatusInfo(outlet.status);
                             return (
                               <div className="flex flex-wrap gap-1 items-center">
@@ -1742,17 +1713,14 @@ const Outlets = ({ stationcode }: { stationcode: any }) => {
                                   }
                                   onClick={(e) => {
                                     if (outlet.status === 1) {
-                                      // If active, open closure dialog
                                       handleAddClosure(outlet, e);
                                     } else {
-                                      // CHANGE THIS LINE: use initiateReactivate
                                       initiateReactivate(outlet.outlet_id, e);
                                     }
                                   }}
                                 >
                                   {statusInfo.text}
                                 </Button>
-                                {/* Push to IRCTC button */}
                                 <Button
                                   className={`text-white text-xs ${
                                     outlet.irctc_application_id
@@ -1791,7 +1759,6 @@ const Outlets = ({ stationcode }: { stationcode: any }) => {
                             <Button
                               variant="destructive"
                               size="sm"
-                              // CHANGE THIS LINE:
                               onClick={(e) =>
                                 initiateDeleteOutlet(outlet.outlet_id, e)
                               }
@@ -1805,6 +1772,35 @@ const Outlets = ({ stationcode }: { stationcode: any }) => {
                               <Edit className="h-4 w-4" />
                             </Button>
                           </div>
+                        </TableCell>
+
+                        <TableCell className="border-x border-gray-200 p-3">
+                          {(() => {
+                            const result = pushResults[outlet.outlet_id];
+                            if (!result) {
+                              return (
+                                <span className="text-xs text-gray-400">—</span>
+                              );
+                            }
+                            if (result.success) {
+                              return (
+                                <div className="flex items-center gap-1 text-green-600">
+                                  <CheckCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                                  <span className="text-xs font-medium">
+                                    {result.date}
+                                  </span>
+                                </div>
+                              );
+                            }
+                            return (
+                              <div className="flex items-start gap-1 text-red-600">
+                                <XCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                                <span className="text-xs leading-snug">
+                                  {result.error}
+                                </span>
+                              </div>
+                            );
+                          })()}
                         </TableCell>
                       </TableRow>
                     ))
